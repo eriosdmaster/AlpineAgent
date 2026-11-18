@@ -1,0 +1,7 @@
+*.jks
+*.keystore
+build/
+.gradle/
+local.properties
+dist/
+app/src/main/assets/proot
