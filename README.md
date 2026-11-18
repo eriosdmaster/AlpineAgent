@@ -57,7 +57,7 @@ Para self-hosted, troque a API URL e o proxy URL.
 Compila **debug e release**, ambos assinados com a sua keystore, e publica os APKs como artefato (e como Release ao subir uma tag `v*`).
 1. `sh scripts/gen-keystore.sh` (gera `alpineagent.jks` e imprime os valores dos secrets). Guarde o `.jks`; não commite.
 2. No repositório: Settings → Secrets and variables → Actions → crie `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`.
-3. (Opcional) secret `PROOT_URL` = link direto de um proot estático aarch64; ou commite o binário em `app/src/main/assets/proot` (o `.gitignore` o ignora por padrão: remova a linha se quiser commitar).
+3. O proot é compilado pelo próprio workflow (job `proot`: upstream proot-me/proot, estático aarch64, em cache). Para usar outro binário, commite-o em `app/src/main/assets/proot` (remova essa linha do `.gitignore`); o arquivo commitado tem prioridade.
 4. Push em `main`/`master`, PR, "Run workflow" manual, ou `git tag v1.0 && git push --tags` para gerar o Release.
 Localmente: `KEYSTORE_FILE=... KEYSTORE_PASSWORD=... KEY_ALIAS=... KEY_PASSWORD=... gradle assembleRelease` (sem `KEYSTORE_FILE`, o debug usa a keystore padrão do Android e o release sai sem assinatura).
 

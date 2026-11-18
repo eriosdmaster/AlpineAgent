@@ -11,7 +11,43 @@ permissions:
   contents: write   # necessário para criar o Release ao subir uma tag
 
 jobs:
+  # Compila o proot estático aarch64 (upstream proot-me/proot, musl, em container Alpine arm64 via QEMU).
+  # Fica em cache: só recompila se mudar a chave (proot-aarch64-v1).
+  proot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/cache@v4
+        id: cache
+        with:
+          path: proot-out
+          key: proot-aarch64-v1
+
+      - uses: docker/setup-qemu-action@v3
+        if: steps.cache.outputs.cache-hit != 'true'
+        with:
+          platforms: arm64
+
+      - name: Compilar proot estático
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p proot-out
+          docker run --rm --platform linux/arm64 -v "$PWD/proot-out:/out" alpine:3.20 sh -ec '
+            apk add --no-cache build-base git talloc-dev talloc-static linux-headers
+            git clone --depth 1 https://github.com/proot-me/proot /src
+            cd /src/src
+            make loader.elf build.h
+            LDFLAGS="-static -ltalloc" make proot
+            strip proot
+            cp proot /out/proot'
+          file proot-out/proot || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: proot-aarch64
+          path: proot-out/proot
+
   build:
+    needs: proot
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,17 +61,16 @@ jobs:
         with:
           gradle-version: 8.7
 
-      # proot estático aarch64 (opcional): secret PROOT_URL com o link direto do binário.
-      # Se o arquivo já estiver commitado em app/src/main/assets/proot, nada é feito.
-      - name: Baixar proot
-        env:
-          PROOT_URL: ${{ secrets.PROOT_URL }}
+      # proot: usa o commitado em app/src/main/assets/proot, se existir; senão o compilado no job "proot".
+      - uses: actions/download-artifact@v4
+        with:
+          name: proot-aarch64
+          path: proot-dl
+
+      - name: Colocar proot nos assets
         run: |
           mkdir -p app/src/main/assets
-          if [ ! -f app/src/main/assets/proot ] && [ -n "$PROOT_URL" ]; then
-            curl -fsSL "$PROOT_URL" -o app/src/main/assets/proot
-          fi
-          [ -f app/src/main/assets/proot ] || echo "::warning::proot ausente: o terminal Alpine não vai funcionar no APK"
+          [ -f app/src/main/assets/proot ] || cp proot-dl/proot app/src/main/assets/proot
 
       - name: Preparar keystore
         env:
